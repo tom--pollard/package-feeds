@@ -1,6 +1,7 @@
 package pypi
 
 import (
+	"fmt"
 	"net/http"
 	"testing"
 	"time"
@@ -11,10 +12,10 @@ import (
 func TestPypiLatest(t *testing.T) {
 	t.Parallel()
 
-	handlers := map[string]testutils.HttpHandlerFunc{
-		"/rss/updates.xml": updatesXmlHandle,
+	handlers := map[string]testutils.HTTPHandlerFunc{
+		"/rss/updates.xml": updatesXMLHandle,
 	}
-	srv := testutils.HttpServerMock(handlers)
+	srv := testutils.HTTPServerMock(handlers)
 
 	baseURL = srv.URL + "/rss/updates.xml"
 	feed := Feed{}
@@ -45,8 +46,8 @@ func TestPypiLatest(t *testing.T) {
 	}
 }
 
-func updatesXmlHandle(w http.ResponseWriter, r *http.Request) {
-	_, _ = w.Write([]byte(`
+func updatesXMLHandle(w http.ResponseWriter, r *http.Request) {
+	_, err := w.Write([]byte(`
 <?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0">
 	<channel>
@@ -71,4 +72,7 @@ func updatesXmlHandle(w http.ResponseWriter, r *http.Request) {
 	</channel>
 </rss>
 `))
+	if err != nil {
+		fmt.Println("Unexpected error during mock http server write: %w", err)
+	}
 }

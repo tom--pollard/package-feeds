@@ -1,6 +1,7 @@
 package crates
 
 import (
+	"fmt"
 	"net/http"
 	"testing"
 	"time"
@@ -11,17 +12,16 @@ import (
 func TestCratesLatest(t *testing.T) {
 	t.Parallel()
 
-	handlers := map[string]testutils.HttpHandlerFunc{
+	handlers := map[string]testutils.HTTPHandlerFunc{
 		"/api/v1/summary": cratesSummaryResponse,
 	}
-	srv := testutils.HttpServerMock(handlers)
+	srv := testutils.HTTPServerMock(handlers)
 
 	baseURL = srv.URL + "/api/v1/summary"
 	feed := Feed{}
 
 	cutoff := time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)
 	pkgs, err := feed.Latest(cutoff)
-
 	if err != nil {
 		t.Fatalf("feed.Latest returned error: %v", err)
 	}
@@ -47,7 +47,7 @@ func TestCratesLatest(t *testing.T) {
 }
 
 func cratesSummaryResponse(w http.ResponseWriter, r *http.Request) {
-	_, _ = w.Write([]byte(`
+	_, err := w.Write([]byte(`
 {
 	"just_updated": [
 		{
@@ -109,4 +109,7 @@ func cratesSummaryResponse(w http.ResponseWriter, r *http.Request) {
 		]
 }
 `))
+	if err != nil {
+		fmt.Println("Unexpected error during mock http server write: %w", err)
+	}
 }
