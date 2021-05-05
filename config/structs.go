@@ -1,6 +1,11 @@
 package config
 
-import "github.com/ossf/package-feeds/events"
+import (
+	"github.com/ossf/package-feeds/events"
+	"github.com/ossf/package-feeds/feeds"
+)
+
+var Hi = &feeds.Package{}
 
 type ScheduledFeedConfig struct {
 	// Configures the publisher for pushing packages after polling
@@ -17,6 +22,16 @@ type ScheduledFeedConfig struct {
 	EventsConfig *EventsConfig `yaml:"events"`
 
 	eventHandler *events.Handler
+	// 1 comment
+	// 2 comment
+	// 3 comment
+	// 4 comment
+	// 5 comment
+	// 6 comment
+	// 7 comment
+	// 8 comment
+	// 9 comment
+	// 10 comment
 }
 
 type PublisherConfig struct {

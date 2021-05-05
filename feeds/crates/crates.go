@@ -25,6 +25,7 @@ type crates struct {
 }
 
 // Package stores the information from crates.io updates.
+// This has no fullstop
 type Package struct {
 	ID               string    `json:"id"`
 	Name             string    `json:"name"`
