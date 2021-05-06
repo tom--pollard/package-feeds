@@ -78,8 +78,8 @@ func (handler FeedHandler) publishPackages(pkgs []*feeds.Package) (int, error) {
 		}).Print("sending package upstream")
 		b, err := json.Marshal(pkg)
 		if err != nil {
-			log.Printf("error marshaling package: %#v", pkg)
-			return processed, err
+			log.Errorf("%v:\nerror marshaling package: %#v", err, pkg)
+			continue
 		}
 		if err := handler.pub.Send(context.Background(), b); err != nil {
 			log.Printf("error sending package to upstream publisher %v", err)
