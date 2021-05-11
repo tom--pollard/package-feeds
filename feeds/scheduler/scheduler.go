@@ -10,13 +10,13 @@ import (
 
 // Scheduler is a registry of feeds that should be run on a schedule.
 type Scheduler struct {
-	registry map[string]feeds.ScheduledFeed
+	Registry map[string]feeds.ScheduledFeed
 }
 
 // New returns a new Scheduler with configured feeds registered.
 func New(feedsMap map[string]feeds.ScheduledFeed) *Scheduler {
 	return &Scheduler{
-		registry: feedsMap,
+		Registry: feedsMap,
 	}
 }
 
@@ -27,10 +27,14 @@ type pollResult struct {
 	err      error
 }
 
-// Poll fetches the latest packages from each registered feed.
-func (s *Scheduler) Poll(cutoff time.Time) ([]*feeds.Package, []error) {
+// Poll fetches the latest packages from each registered feed, or a specific set.
+func (s *Scheduler) Poll(cutoff time.Time, feedsToPoll []string) ([]*feeds.Package, []error) {
 	results := make(chan pollResult)
-	for name, feed := range s.registry {
+	errs := []error{}
+	packages := []*feeds.Package{}
+	log.Printf("Value of feedstoPoll inside scheduler %s", feedsToPoll[0])
+	for _, feedName := range feedsToPoll {
+		log.Printf("Calling go func on %s", feedName)
 		go func(name string, feed feeds.ScheduledFeed) {
 			result := pollResult{
 				name: name,
@@ -38,11 +42,10 @@ func (s *Scheduler) Poll(cutoff time.Time) ([]*feeds.Package, []error) {
 			}
 			result.packages, result.err = feed.Latest(cutoff)
 			results <- result
-		}(name, feed)
+		}(feedName, s.Registry[feedName])
 	}
-	errs := []error{}
-	packages := []*feeds.Package{}
-	for i := 0; i < len(s.registry); i++ {
+
+	for i := 0; i < len(feedsToPoll); i++ {
 		result := <-results
 
 		logger := log.WithField("feed", result.name)

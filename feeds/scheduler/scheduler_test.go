@@ -19,6 +19,10 @@ func (mf mockFeed) Latest(cutoff time.Time) ([]*feeds.Package, error) {
 	return mf.packages, mf.err
 }
 
+func (mf mockFeed) GetPollRate() time.Duration {
+	return 0
+}
+
 func TestPoll(t *testing.T) {
 	t.Parallel()
 
@@ -34,10 +38,8 @@ func TestPoll(t *testing.T) {
 		},
 	}
 
-	sched := &Scheduler{
-		registry: registry,
-	}
-	gotPackages, gotErrs := sched.Poll(time.Now())
+	sched := &Scheduler{registry}
+	gotPackages, gotErrs := sched.Poll(time.Now(), nil)
 	if len(gotErrs) != 1 {
 		t.Fatalf("incorrect number of errors received. expected %d got %d", 1, len(gotErrs))
 	}

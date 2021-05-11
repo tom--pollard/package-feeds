@@ -135,7 +135,8 @@ func fetchPackageInfo(url string) (*nugetPackageDetails, error) {
 }
 
 type Feed struct {
-	baseURL string
+	baseURL  string
+	pollRate time.Duration
 }
 
 func New(feedOptions feeds.FeedOptions) (*Feed, error) {
@@ -144,6 +145,16 @@ func New(feedOptions feeds.FeedOptions) (*Feed, error) {
 			Feed:   FeedName,
 			Option: "packages",
 		}
+	}
+	if feedOptions.PollRate != "" {
+		pollRate, err := time.ParseDuration(feedOptions.PollRate)
+		if err != nil {
+			return nil, err
+		}
+		return &Feed{
+			baseURL:  "https://api.nuget.org/",
+			pollRate: pollRate,
+		}, nil
 	}
 	return &Feed{
 		baseURL: "https://api.nuget.org/",
@@ -200,4 +211,8 @@ func (feed Feed) Latest(cutoff time.Time) ([]*feeds.Package, error) {
 	pkgs = feeds.ApplyCutoff(pkgs, cutoff)
 
 	return pkgs, nil
+}
+
+func (feed Feed) GetPollRate() time.Duration {
+	return feed.pollRate
 }

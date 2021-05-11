@@ -20,15 +20,21 @@ import (
 
 // FeedHandler is a handler that fetches new packages from various feeds.
 type FeedHandler struct {
-	scheduler *scheduler.Scheduler
-	pub       publisher.Publisher
-	pollRate  time.Duration
-	lastPoll  time.Time
+	scheduler         *scheduler.Scheduler
+	pub               publisher.Publisher
+	specificLastPolls map[string]time.Time
+	pollRate          time.Duration
+	lastPoll          time.Time
 }
 
 func (handler *FeedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var err error
-	pkgs, pollErrors := handler.pollFeeds()
+	// Assume polling of all configured feeds if triggered via http request.
+	var feedsToPoll []string
+	for feedName, _ := range handler.scheduler.Registry {
+		feedsToPoll = append(feedsToPoll, feedName)
+	}
+	pkgs, pollErrors := handler.pollFeeds(feedsToPoll)
 	processedPackages, err := handler.publishPackages(pkgs)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -44,20 +50,29 @@ func (handler *FeedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (handler FeedHandler) getCutoff() time.Time {
+func (handler FeedHandler) getCutoff(pollRate time.Duration, lastPoll time.Time) time.Time {
 	var cutoff time.Time
-	if handler.lastPoll.IsZero() {
-		cutoff = time.Now().UTC().Add(-handler.pollRate)
+	if lastPoll.IsZero() {
+		cutoff = time.Now().UTC().Add(-pollRate)
 	} else {
-		cutoff = handler.lastPoll
+		cutoff = lastPoll
 	}
 	return cutoff
 }
 
-func (handler *FeedHandler) pollFeeds() ([]*feeds.Package, bool) {
-	cutoff := handler.getCutoff()
-	handler.lastPoll = time.Now().UTC()
-	pkgs, errs := handler.scheduler.Poll(cutoff)
+func (handler *FeedHandler) pollFeeds(feedsToPoll []string) ([]*feeds.Package, bool) {
+	lastPoll := handler.lastPoll
+	pollRate := handler.pollRate
+	if len(feedsToPoll) == 1 {
+		// If we're polling a specific feed, get the unique values
+		log.Printf("Getting specific details %s", feedsToPoll[0])
+		lastPoll = handler.specificLastPolls[feedsToPoll[0]]
+		pollRate = handler.scheduler.Registry[feedsToPoll[0]].GetPollRate()
+	}
+	cutoff := handler.getCutoff(pollRate, lastPoll)
+	lastPoll = time.Now().UTC()
+	log.Printf("Calling poll for %s", feedsToPoll[0])
+	pkgs, errs := handler.scheduler.Poll(cutoff, feedsToPoll)
 	errors := len(errs) > 0
 	return pkgs, errors
 }
@@ -118,25 +133,42 @@ func main() {
 	sched := scheduler.New(scheduledFeeds)
 
 	log.Printf("listening on port %v", appConfig.HTTPPort)
-	pollRate, err := time.ParseDuration(appConfig.PollRate)
+
+	rate, err := time.ParseDuration(appConfig.PollRate)
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	handler := &FeedHandler{
 		scheduler: sched,
 		pub:       pub,
-		pollRate:  pollRate,
+		pollRate:  rate,
 	}
 
-	if appConfig.Timer {
-		cronjob := cron.New()
-		crontab := fmt.Sprintf("@every %s", pollRate.String())
-		log.Printf("Running a timer %s", crontab)
-		err := cronjob.AddFunc(crontab, func() { cronPoll(handler) })
+	if !appConfig.Timer {
+		cronHandler := cron.New()
+		var schedFeedArray []string
+		// Create feed specific polls, if configured.
+		for feedName, schedFeed := range scheduledFeeds {
+			pollRate := schedFeed.GetPollRate()
+			if pollRate != 0 {
+				cronTab := fmt.Sprintf("@every %s", pollRate.String())
+				log.Printf("Running a timer %s for feed: %s ", cronTab, feedName)
+				err = cronHandler.AddFunc(cronTab, func() { cronPoll(handler, []string{feedName}) })
+				if err != nil {
+					log.Fatal(err)
+				}
+			} else {
+				schedFeedArray = append(schedFeedArray, feedName)
+			}
+		}
+		cronTab := fmt.Sprintf("@every %s", handler.pollRate.String())
+		log.Printf("Running a timer %s", cronTab)
+		err = cronHandler.AddFunc(cronTab, func() { cronPoll(handler, schedFeedArray) })
 		if err != nil {
 			log.Fatal(err)
 		}
-		cronjob.Start()
+		cronHandler.Start()
 	}
 
 	http.Handle("/", handler)
@@ -145,8 +177,9 @@ func main() {
 	}
 }
 
-func cronPoll(handler *FeedHandler) {
-	pkgs, pollErrors := handler.pollFeeds()
+func cronPoll(handler *FeedHandler, feedsToPoll []string) {
+	log.Printf("Inside cronfunc, calling pollFeeds with %s", feedsToPoll[0])
+	pkgs, pollErrors := handler.pollFeeds(feedsToPoll)
 	processedPackages, err := handler.publishPackages(pkgs)
 	if err != nil {
 		log.Errorf(err.Error())

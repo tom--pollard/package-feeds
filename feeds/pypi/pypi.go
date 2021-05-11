@@ -135,12 +135,25 @@ func fetchCriticalPackages(baseURL string, packageList []string) ([]*Package, er
 
 type Feed struct {
 	packages *[]string
+	pollRate time.Duration
 
 	lossyFeedAlerter *feeds.LossyFeedAlerter
 	baseURL          string
 }
 
 func New(feedOptions feeds.FeedOptions, eventHandler *events.Handler) (*Feed, error) {
+	if feedOptions.PollRate != "" {
+		pollRate, err := time.ParseDuration(feedOptions.PollRate)
+		if err != nil {
+			return nil, err
+		}
+		return &Feed{
+			packages:         feedOptions.Packages,
+			pollRate:         pollRate,
+			lossyFeedAlerter: feeds.NewLossyFeedAlerter(eventHandler),
+			baseURL:          "https://pypi.org/",
+		}, nil
+	}
 	return &Feed{
 		packages:         feedOptions.Packages,
 		lossyFeedAlerter: feeds.NewLossyFeedAlerter(eventHandler),
@@ -188,4 +201,8 @@ func (feed Feed) Latest(cutoff time.Time) ([]*feeds.Package, error) {
 
 func (feed Feed) GetPackageList() *[]string {
 	return feed.packages
+}
+
+func (feed Feed) GetPollRate() time.Duration {
+	return feed.pollRate
 }

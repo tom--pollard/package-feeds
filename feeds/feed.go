@@ -14,6 +14,7 @@ type UnsupportedOptionError struct {
 
 type ScheduledFeed interface {
 	Latest(cutoff time.Time) ([]*Package, error)
+	GetPollRate() time.Duration
 }
 
 // General configuration options for feeds.
@@ -21,6 +22,9 @@ type FeedOptions struct {
 	// A collection of package names to poll instead of standard firehose behaviour.
 	// Not supported by all feeds.
 	Packages *[]string `yaml:"packages"`
+	// A specific rate to poll the given feed at, if given. Only functional if
+	// ScheduledFeedConfig.Timer == true.
+	PollRate string `yaml:"poll_rate"`
 }
 
 // Marshalled json output validated against package.schema.json.

@@ -95,6 +95,7 @@ func (sc *ScheduledFeedConfig) GetScheduledFeeds() (map[string]feeds.ScheduledFe
 	for _, entry := range sc.Feeds {
 		feed, err := entry.ToFeed(eventHandler)
 		if err != nil {
+			fmt.Println(entry.Type)
 			return nil, err
 		}
 		scheduledFeeds[entry.Type] = feed

@@ -132,6 +132,8 @@ func fetchPackages(baseURL, pkgTitle string, count int) ([]*Package, error) {
 }
 
 type Feed struct {
+	pollRate time.Duration
+
 	lossyFeedAlerter *feeds.LossyFeedAlerter
 	baseURL          string
 }
@@ -142,6 +144,17 @@ func New(feedOptions feeds.FeedOptions, eventHandler *events.Handler) (*Feed, er
 			Feed:   FeedName,
 			Option: "packages",
 		}
+	}
+	if feedOptions.PollRate != "" {
+		pollRate, err := time.ParseDuration(feedOptions.PollRate)
+		if err != nil {
+			return nil, err
+		}
+		return &Feed{
+			pollRate:         pollRate,
+			lossyFeedAlerter: feeds.NewLossyFeedAlerter(eventHandler),
+			baseURL:          "https://registry.npmjs.org/",
+		}, nil
 	}
 	return &Feed{
 		lossyFeedAlerter: feeds.NewLossyFeedAlerter(eventHandler),
@@ -203,4 +216,9 @@ func (feed Feed) Latest(cutoff time.Time) ([]*feeds.Package, error) {
 
 	pkgs = feeds.ApplyCutoff(pkgs, cutoff)
 	return pkgs, nil
+}
+
+func (feed Feed) GetPollRate() time.Duration {
+	rate, _ := time.ParseDuration("1m")
+	return rate
 }

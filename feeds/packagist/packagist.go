@@ -31,6 +31,7 @@ type actions struct {
 type Feed struct {
 	updateHost  string
 	versionHost string
+	pollRate    time.Duration
 }
 
 func New(feedOptions feeds.FeedOptions) (*Feed, error) {
@@ -39,6 +40,17 @@ func New(feedOptions feeds.FeedOptions) (*Feed, error) {
 			Feed:   FeedName,
 			Option: "packages",
 		}
+	}
+	if feedOptions.PollRate != "" {
+		pollRate, err := time.ParseDuration(feedOptions.PollRate)
+		if err != nil {
+			return nil, err
+		}
+		return &Feed{
+			updateHost:  "https://packagist.org",
+			versionHost: "https://repo.packagist.org",
+			pollRate:    pollRate,
+		}, nil
 	}
 	return &Feed{
 		updateHost:  "https://packagist.org",
@@ -123,4 +135,8 @@ func (f Feed) Latest(cutoff time.Time) ([]*feeds.Package, error) {
 	}
 	pkgs = feeds.ApplyCutoff(pkgs, cutoff)
 	return pkgs, nil
+}
+
+func (f Feed) GetPollRate() time.Duration {
+	return f.pollRate
 }
